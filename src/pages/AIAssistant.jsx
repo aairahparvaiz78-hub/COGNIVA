@@ -1,0 +1,493 @@
+import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  ArrowLeft,
+  Bot,
+  Brain,
+  BookOpen,
+  Check,
+  Copy,
+  Lightbulb,
+  MessageCircle,
+  RefreshCw,
+  Send,
+  Sparkles,
+  Trash2,
+  User,
+} from "lucide-react";
+import Sidebar from "../components/Sidebar";
+
+const starterMessages = [
+  {
+    id: 1,
+    role: "assistant",
+    text: "Hi! I'm Cogniva AI 👋 Ask me anything about your studies. I can explain concepts, create practice questions, summarize topics, or help you plan your revision.",
+  },
+];
+
+const quickPrompts = [
+  {
+    icon: Brain,
+    title: "Explain a concept",
+    prompt: "Explain virtual memory in simple words with an example.",
+  },
+  {
+    icon: BookOpen,
+    title: "Make notes",
+    prompt: "Make short exam-friendly notes on CPU scheduling.",
+  },
+  {
+    icon: Lightbulb,
+    title: "Practice questions",
+    prompt: "Give me 5 important questions for my upcoming exam.",
+  },
+  {
+    icon: Sparkles,
+    title: "Study advice",
+    prompt: "Give me a focused study plan for today.",
+  },
+];
+
+function createAIResponse(message) {
+  const text = message.toLowerCase();
+
+  if (text.includes("virtual memory")) {
+    return `Virtual memory is a memory-management technique that allows a computer to use part of the storage drive as an extension of RAM.
+
+Simple example:
+• RAM = your study table
+• Disk = your cupboard
+• Virtual memory = moving less-used books to the cupboard when the table becomes full
+
+Important points:
+1. It allows programs larger than physical RAM to run.
+2. It uses secondary storage.
+3. Pages can be moved between RAM and disk.
+4. Page faults occur when a required page is not currently in RAM.
+5. It improves memory utilization but disk access is slower than RAM.`;
+  }
+
+  if (
+    text.includes("schedule") ||
+    text.includes("study plan") ||
+    text.includes("revision")
+  ) {
+    return `Here's a simple focused study plan:
+
+1. 45 min — Learn/revise the hardest topic.
+2. 10 min — Take a short break.
+3. 45 min — Solve questions or practice problems.
+4. 10 min — Break.
+5. 45 min — Revise a second subject.
+6. 15 min — Active recall without looking at notes.
+7. 20 min — Review mistakes and make tomorrow's task list.
+
+Tip: Start with your weakest or most urgent topic while your concentration is highest.`;
+  }
+
+  if (
+    text.includes("question") ||
+    text.includes("practice") ||
+    text.includes("quiz")
+  ) {
+    return `Here are 5 practice questions:
+
+1. Define the concept and explain its importance.
+2. Differentiate between the two major approaches used in this topic.
+3. Explain the working process with a suitable example.
+4. Solve a numerical/problem based on the concept.
+5. Explain one practical application.
+
+Try answering them without looking at your notes first.`;
+  }
+
+  if (
+    text.includes("notes") ||
+    text.includes("summarize") ||
+    text.includes("summary")
+  ) {
+    return `Quick exam-friendly note structure:
+
+• Definition — Write the basic meaning in 1–2 lines.
+• Key points — List the important characteristics.
+• Working — Explain the process step-by-step.
+• Example — Add one simple example.
+• Advantages — Mention 2–3 points.
+• Limitations — Mention 1–2 points.
+• Application — State where it is used.
+
+This structure works well for many 5–10 mark answers.`;
+  }
+
+  return `I can help you with that.
+
+Try asking me things like:
+• "Explain this concept in simple words."
+• "Give me short exam notes."
+• "Give me 5 practice questions."
+• "Make a revision plan."
+• "Explain this code line by line."
+
+For the best answer, include the subject and exact topic you're studying.`;
+}
+
+function AIAssistant() {
+  const [messages, setMessages] = useState(starterMessages);
+  const [input, setInput] = useState("");
+  const [copiedId, setCopiedId] = useState(null);
+  const [isTyping, setIsTyping] = useState(false);
+
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("cogniva_ai_chat");
+
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
+        }
+      } catch {
+        localStorage.removeItem("cogniva_ai_chat");
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("cogniva_ai_chat", JSON.stringify(messages));
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const sendMessage = (message = input) => {
+    const cleanMessage = message.trim();
+
+    if (!cleanMessage || isTyping) {
+      return;
+    }
+
+    const userMessage = {
+      id: Date.now(),
+      role: "user",
+      text: cleanMessage,
+    };
+
+    setMessages((current) => [...current, userMessage]);
+    setInput("");
+    setIsTyping(true);
+
+    setTimeout(() => {
+      const response = {
+        id: Date.now() + 1,
+        role: "assistant",
+        text: createAIResponse(cleanMessage),
+      };
+
+      setMessages((current) => [...current, response]);
+      setIsTyping(false);
+    }, 900);
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    sendMessage();
+  };
+
+  const clearChat = () => {
+    setMessages(starterMessages);
+    localStorage.removeItem("cogniva_ai_chat");
+  };
+
+  const copyMessage = async (id, text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+
+      setTimeout(() => {
+        setCopiedId(null);
+      }, 1500);
+    } catch {
+      // Clipboard may not be available in some browsers.
+    }
+  };
+
+  return (
+    <div className="app-shell">
+      <Sidebar />
+
+      <main className="main-content">
+        <div className="page-container ai-assistant-page">
+          {/* HEADER */}
+          <div className="page-header">
+            <div>
+              <Link to="/dashboard" className="back-link">
+                <ArrowLeft size={16} />
+                Back to Dashboard
+              </Link>
+
+              <div className="page-title-row">
+                <div className="page-icon ai-icon">
+                  <Bot size={25} />
+                </div>
+
+                <div>
+                  <h1>AI Study Assistant</h1>
+                  <p>
+                    Your personal study companion for explanations,
+                    revision, practice, and study advice.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={clearChat}
+            >
+              <Trash2 size={17} />
+              Clear Chat
+            </button>
+          </div>
+
+          <div className="assistant-layout">
+            {/* CHAT */}
+            <section className="glass assistant-chat-card">
+              <div className="assistant-chat-header">
+                <div className="assistant-profile">
+                  <div className="assistant-avatar">
+                    <Bot size={21} />
+                  </div>
+
+                  <div>
+                    <strong>Cogniva AI</strong>
+                    <span>
+                      <span className="online-dot" />
+                      Study assistant
+                    </span>
+                  </div>
+                </div>
+
+                <div className="assistant-status">
+                  <Sparkles size={15} />
+                  AI Ready
+                </div>
+              </div>
+
+              <div className="assistant-messages">
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`assistant-message-row ${
+                      message.role === "user" ? "user-row" : "ai-row"
+                    }`}
+                  >
+                    <div
+                      className={`assistant-message-avatar ${
+                        message.role === "user"
+                          ? "user-avatar"
+                          : "ai-message-avatar"
+                      }`}
+                    >
+                      {message.role === "user" ? (
+                        <User size={16} />
+                      ) : (
+                        <Bot size={16} />
+                      )}
+                    </div>
+
+                    <div className="assistant-message-content">
+                      <div className="assistant-message-bubble">
+                        {message.text.split("\n").map((line, index) => (
+                          <span key={index}>
+                            {line}
+                            {index < message.text.split("\n").length - 1 && (
+                              <br />
+                            )}
+                          </span>
+                        ))}
+                      </div>
+
+                      {message.role === "assistant" && (
+                        <button
+                          type="button"
+                          className="copy-message-btn"
+                          onClick={() =>
+                            copyMessage(message.id, message.text)
+                          }
+                        >
+                          {copiedId === message.id ? (
+                            <>
+                              <Check size={13} />
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={13} />
+                              Copy
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {isTyping && (
+                  <div className="assistant-message-row ai-row">
+                    <div className="assistant-message-avatar ai-message-avatar">
+                      <Bot size={16} />
+                    </div>
+
+                    <div className="assistant-message-content">
+                      <div className="assistant-message-bubble typing-bubble">
+                        <span className="typing-dot" />
+                        <span className="typing-dot" />
+                        <span className="typing-dot" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
+              </div>
+
+              <form
+                className="assistant-input-area"
+                onSubmit={handleSubmit}
+              >
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(event) => setInput(event.target.value)}
+                  placeholder="Ask Cogniva AI anything about your studies..."
+                  disabled={isTyping}
+                />
+
+                <button
+                  type="submit"
+                  className="assistant-send-btn"
+                  disabled={!input.trim() || isTyping}
+                  aria-label="Send message"
+                >
+                  <Send size={19} />
+                </button>
+              </form>
+
+              <p className="assistant-disclaimer">
+                <Sparkles size={13} />
+                AI responses may need verification for important academic
+                information.
+              </p>
+            </section>
+
+            {/* SIDEBAR */}
+            <aside className="assistant-tools">
+              <div className="glass quick-prompts-card">
+                <div className="assistant-section-title">
+                  <div>
+                    <span className="eyebrow">
+                      <MessageCircle size={14} />
+                      Quick Prompts
+                    </span>
+
+                    <h2>What can I help with?</h2>
+                  </div>
+                </div>
+
+                <div className="quick-prompts-list">
+                  {quickPrompts.map((item) => {
+                    const Icon = item.icon;
+
+                    return (
+                      <button
+                        type="button"
+                        key={item.title}
+                        className="quick-prompt"
+                        onClick={() => sendMessage(item.prompt)}
+                        disabled={isTyping}
+                      >
+                        <div className="quick-prompt-icon">
+                          <Icon size={18} />
+                        </div>
+
+                        <div>
+                          <strong>{item.title}</strong>
+                          <span>{item.prompt}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="glass assistant-capabilities">
+                <div className="assistant-section-title">
+                  <div className="capability-title-icon">
+                    <Sparkles size={17} />
+                  </div>
+
+                  <div>
+                    <h3>Cogniva can help you</h3>
+                  </div>
+                </div>
+
+                <ul>
+                  <li>
+                    <Check size={15} />
+                    Understand difficult concepts
+                  </li>
+
+                  <li>
+                    <Check size={15} />
+                    Create exam-friendly notes
+                  </li>
+
+                  <li>
+                    <Check size={15} />
+                    Generate practice questions
+                  </li>
+
+                  <li>
+                    <Check size={15} />
+                    Explain programming code
+                  </li>
+
+                  <li>
+                    <Check size={15} />
+                    Build revision strategies
+                  </li>
+
+                  <li>
+                    <Check size={15} />
+                    Give study productivity tips
+                  </li>
+                </ul>
+              </div>
+
+              <div className="glass assistant-planner-link">
+                <div className="planner-link-icon">
+                  <RefreshCw size={19} />
+                </div>
+
+                <div>
+                  <strong>Need a full schedule?</strong>
+                  <p>
+                    Let Cogniva create a personalized study plan.
+                  </p>
+
+                  <Link to="/ai-planner">
+                    Open AI Planner →
+                  </Link>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+export default AIAssistant;
