@@ -40,13 +40,35 @@ const features = [
   },
 ];
 
+function CognivaMark({ size = 20 }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width={size}
+      height={size}
+      viewBox="0 0 32 32"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.55"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M5.5 11.5c4.1-.8 7.5.2 10.5 3v12c-3-2.8-6.4-3.8-10.5-3v-12Z" />
+      <path d="M26.5 11.5c-4.1-.8-7.5.2-10.5 3v12c3-2.8 6.4-3.8 10.5-3v-12Z" />
+      <path d="M12.4 8.3 16 5l3.6 3.3" />
+      <path d="M16 5v5.2" />
+      <circle cx="16" cy="4" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 export default function Home() {
   return (
     <main className="cogniva-home">
       <nav className="home-nav" aria-label="Main navigation">
         <Link to="/" className="home-brand" aria-label="Cogniva home">
-          <span className="home-brand-mark"><Brain size={19} strokeWidth={1.8} /></span>
-          <span>cogniva<span className="brand-period">.</span></span>
+          <span className="home-brand-mark"><CognivaMark size={21} /></span>
+          <span>COGNIVA<span className="brand-period">.</span></span>
         </Link>
         <div className="home-nav-links">
           <a href="#approach">The approach</a>
@@ -74,7 +96,7 @@ export default function Home() {
           <div className="art-orbit orbit-one" /><div className="art-orbit orbit-two" />
           <div className="art-caption"><span>01 / YOUR WEEK, IN VIEW</span><span>MON — FRI</span></div>
           <div className="study-window">
-            <div className="window-topline"><span className="window-logo"><Brain size={15} /> cogniva</span><span className="window-date">THURSDAY, OCT 8</span><span className="window-avatar">A</span></div>
+            <div className="window-topline"><span className="window-logo"><CognivaMark size={19} /> COGNIVA</span><span className="window-date">THURSDAY, OCT 8</span><span className="window-avatar">A</span></div>
             <div className="window-welcome"><div><span className="window-eyebrow">YOUR STUDY DESK</span><h2>A little progress<br /><em>goes a long way.</em></h2></div><span className="sun-mark">✳</span></div>
             <div className="window-grid">
               <div className="window-card week-card"><div className="window-card-title">This week <span>↗</span></div><div className="week-total">8.5 <small>hrs focused</small></div><div className="week-bars"><i style={{height:"38%"}}/><i style={{height:"62%"}}/><i style={{height:"46%"}}/><i className="bar-today" style={{height:"84%"}}/><i style={{height:"55%"}}/><i style={{height:"32%"}}/><i style={{height:"18%"}}/></div><div className="week-days"><span>M</span><span>T</span><span>W</span><b>T</b><span>F</span><span>S</span><span>S</span></div></div>
@@ -106,7 +128,7 @@ export default function Home() {
         <Link to="/signup" className="closer-cta">Create your space <ArrowRight size={17}/></Link>
       </section>
 
-      <footer className="home-footer"><Link to="/" className="home-brand"><span className="home-brand-mark"><Brain size={17}/></span><span>cogniva<span className="brand-period">.</span></span></Link><span>Make a little room for learning.</span><span>© {new Date().getFullYear()} COGNIVA</span></footer>
+      <footer className="home-footer"><Link to="/" className="home-brand"><span className="home-brand-mark"><CognivaMark size={21}/></span><span>COGNIVA<span className="brand-period">.</span></span></Link><span>Make a little room for learning.</span><span>© {new Date().getFullYear()} COGNIVA</span></footer>
     </main>
   );
 }

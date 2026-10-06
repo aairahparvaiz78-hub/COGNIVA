@@ -13,6 +13,7 @@ import {
   X,
   Sparkles,
   Target,
+  Layers3,
 } from "lucide-react";
 
 export default function Sidebar({ mobileOpen = false, onClose }) {
@@ -41,6 +42,11 @@ export default function Sidebar({ mobileOpen = false, onClose }) {
       name: "Subjects",
       path: "/subjects",
       icon: BookOpen,
+    },
+    {
+      name: "Flashcards",
+      path: "/flashcards",
+      icon: Layers3,
     },
     {
       name: "Calendar",

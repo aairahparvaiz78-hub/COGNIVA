@@ -14,6 +14,7 @@ import Exams from "./pages/Exams";
 import Analytics from "./pages/Analytics";
 import AIPlanner from "./pages/AIPlanner";
 import AIAssistant from "./pages/AIAssistant";
+import Flashcards from "./pages/Flashcards";
 
 function ProtectedRoute({ children }) {
   const isAuthenticated =
@@ -59,6 +60,15 @@ function App() {
           element={
             <ProtectedRoute>
               <Subjects />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/flashcards"
+          element={
+            <ProtectedRoute>
+              <Flashcards />
             </ProtectedRoute>
           }
         />
