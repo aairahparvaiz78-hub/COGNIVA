@@ -63,8 +63,8 @@ async function readJson(request) {
 }
 
 const server = createServer(async (request, response) => {
-  const isChatRequest = request.method === "POST" && request.url === "/api/groq/chat";
-  const isFlashcardRequest = request.method === "POST" && request.url === "/api/groq/flashcards";
+  const isChatRequest = request.method === "POST" && request.url === "https://cogniva-xfnq.onrender.com/api/groq/chat";
+  const isFlashcardRequest = request.method === "POST" && request.url === "https://cogniva-xfnq.onrender.com/api/groq/flashcards";
   if (!isChatRequest && !isFlashcardRequest) {
     sendJson(response, 404, { error: "Not found." });
     return;
@@ -96,7 +96,7 @@ const server = createServer(async (request, response) => {
         return;
       }
 
-      const flashcardResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      const flashcardResponse = await fetch("https://cogniva-xfnq.onrender.com/api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
@@ -166,7 +166,7 @@ const server = createServer(async (request, response) => {
       return { role: message.role, content };
     });
 
-    const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    const groqResponse = await fetch("https://cogniva-xfnq.onrender.com/api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.GROQ_API_KEY}`,

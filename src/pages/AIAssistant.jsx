@@ -101,7 +101,7 @@ function AIAssistant() {
         .filter((item) => ["user", "assistant"].includes(item.role))
         .slice(-24)
         .map(({ role, text }) => ({ role, content: text }));
-      const apiResponse = await fetch("/api/groq/chat", {
+      const apiResponse = await fetch("https://cogniva-xfnq.onrender.com/api/groq/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: conversation }),

@@ -107,7 +107,7 @@ function Flashcards() {
     setIsGenerating(true);
     setGenerationError("");
     try {
-      const response = await fetch("/api/groq/flashcards", {
+      const response = await fetch("https://cogniva-xfnq.onrender.com/api/groq/flashcards", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
