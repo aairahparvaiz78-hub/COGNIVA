@@ -14,7 +14,7 @@
 - **Build a study routine** with the AI Study Planner.
 - **Ask for help** with the Groq-powered AI Study Assistant.
 
-## Built with
+## Built with 
 
 - React and Vite
 - React Router
