@@ -14,6 +14,7 @@ import {
   Sparkles,
   Target,
   Timer,
+  RotateCcw,
 } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 
@@ -142,6 +143,7 @@ function Dashboard() {
               <div className="workspace-card-heading"><div><span className="workspace-eyebrow">PICK UP WHERE YOU LEFT OFF</span><h2>Quick paths</h2></div></div>
               <div className="dashboard-shortcuts">
                 <Link to="/pomodoro"><Timer size={16} /><span>Focus session</span><ArrowUpRight size={13} /></Link>
+                <Link to="/recall"><RotateCcw size={16} /><span>Daily Recall Ritual</span><ArrowUpRight size={13} /></Link>
                 <Link to="/calendar"><CalendarDays size={16} /><span>Study calendar</span><ArrowUpRight size={13} /></Link>
                 <Link to="/subjects"><BookOpen size={16} /><span>My subjects</span><ArrowUpRight size={13} /></Link>
                 <Link to="/analytics"><BarChart3 size={16} /><span>Progress</span><ArrowUpRight size={13} /></Link>

@@ -14,6 +14,7 @@ import {
   Sparkles,
   Trash2,
   X,
+  WandSparkles,
 } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 
@@ -30,6 +31,14 @@ function readDecks() {
 
 function Flashcards() {
   const [decks, setDecks] = useState(readDecks);
+  const [subjects] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("cogniva_subjects") || "[]");
+      return Array.isArray(saved) ? saved : [];
+    } catch {
+      return [];
+    }
+  });
   const [activeDeckId, setActiveDeckId] = useState(() => readDecks()[0]?.id || null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -37,6 +46,9 @@ function Flashcards() {
   const [deckForm, setDeckForm] = useState({ title: "", subject: "" });
   const [cardForm, setCardForm] = useState({ front: "", back: "" });
   const [session, setSession] = useState({ reviewed: 0, remembered: 0, practice: 0 });
+  const [generator, setGenerator] = useState({ subject: "", topic: "", kind: "mixed", count: "8" });
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState("");
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(decks));
@@ -89,6 +101,59 @@ function Flashcards() {
     setModal(null);
   };
 
+  const generateFlashcards = async (event) => {
+    event.preventDefault();
+    if (!generator.subject || !generator.topic.trim() || isGenerating) return;
+    setIsGenerating(true);
+    setGenerationError("");
+    try {
+      const response = await fetch("/api/groq/flashcards", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: generator.subject,
+          topic: generator.topic.trim(),
+          kind: generator.kind,
+          count: Number(generator.count),
+        }),
+      });
+      const responseText = await response.text();
+      let result = {};
+      if (responseText.trim()) {
+        try {
+          result = JSON.parse(responseText);
+        } catch {
+          throw new Error(`The flashcard service returned an unreadable response (HTTP ${response.status}).`);
+        }
+      }
+      if (!response.ok) {
+        throw new Error(result.error || `Flashcard generation failed (HTTP ${response.status}).`);
+      }
+      if (!Array.isArray(result.cards) || result.cards.length === 0) {
+        throw new Error("No cards were returned. Try a more specific topic.");
+      }
+      const topic = generator.topic.trim();
+      const deck = {
+        id: `deck-${Date.now()}`,
+        title: topic,
+        subject: generator.subject,
+        cards: result.cards.map((card, index) => ({
+          id: `card-${Date.now()}-${index}`,
+          front: card.front,
+          back: card.back,
+        })),
+        createdAt: Date.now(),
+        generated: true,
+      };
+      setDecks((current) => [...current, deck]);
+      selectDeck(deck.id);
+    } catch (error) {
+      setGenerationError(error.message || "Could not generate flashcards. Check that the Groq API server is running.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const removeDeck = (deck) => {
     if (!window.confirm(`Delete the “${deck.title}” deck and all its cards?`)) return;
     const remaining = decks.filter((item) => item.id !== deck.id);
@@ -108,6 +173,24 @@ function Flashcards() {
   };
 
   const rateCard = (remembered) => {
+    const now = Date.now();
+    const previousReviews = Number(activeCard.reviewCount || 0);
+    const previousInterval = Number(activeCard.intervalDays || 0);
+    const intervalDays = remembered
+      ? (previousReviews === 0 ? 1 : previousReviews === 1 ? 3 : Math.max(3, previousInterval * 2))
+      : 0;
+    const dueAt = remembered
+      ? now + intervalDays * 24 * 60 * 60 * 1000
+      : now + 10 * 60 * 1000;
+
+    setDecks((current) => current.map((deck) => deck.id === activeDeck.id
+      ? {
+          ...deck,
+          cards: deck.cards.map((card) => card.id === activeCard.id
+            ? { ...card, reviewCount: previousReviews + 1, intervalDays, lastReviewedAt: now, dueAt }
+            : card),
+        }
+      : deck));
     setSession((current) => ({
       reviewed: current.reviewed + 1,
       remembered: current.remembered + (remembered ? 1 : 0),
@@ -141,6 +224,52 @@ function Flashcards() {
             <div className="flashcards-session-summary">
               <span>THIS SESSION</span><strong>{session.reviewed} <small>reviewed</small></strong>
               <span>{session.remembered} remembered · {session.practice} to revisit</span>
+            </div>
+          </section>
+
+          <section className="flashcards-generator glass">
+            <div className="flashcards-generator-copy">
+              <span className="eyebrow"><WandSparkles size={13} /> MADE FOR WHAT YOU’RE LEARNING</span>
+              <h2>Turn a topic into a <em>study stack.</em></h2>
+              <p>Choose a subject and topic. Cogniva will shape the key ideas into cards you can flip through and remember.</p>
+              <form className="flashcards-generator-form" onSubmit={generateFlashcards}>
+                <label className="flashcards-generator-field">
+                  <span>Subject</span>
+                  <select value={generator.subject} onChange={(event) => setGenerator({ ...generator, subject: event.target.value })} required disabled={subjects.length === 0}>
+                    <option value="">{subjects.length ? "Choose a subject" : "Add a subject first"}</option>
+                    {subjects.map((subject) => <option value={subject.name} key={subject.id || subject.name}>{subject.name}</option>)}
+                  </select>
+                </label>
+                <label className="flashcards-generator-field flashcards-topic-field">
+                  <span>Topic</span>
+                  <input value={generator.topic} onChange={(event) => setGenerator({ ...generator, topic: event.target.value })} maxLength={180} placeholder="e.g. Newton’s laws of motion" required />
+                </label>
+                <label className="flashcards-generator-field">
+                  <span>Card style</span>
+                  <select value={generator.kind} onChange={(event) => setGenerator({ ...generator, kind: event.target.value })}>
+                    <option value="mixed">A thoughtful mix</option>
+                    <option value="definitions">Definitions</option>
+                    <option value="formulas">Formulas</option>
+                  </select>
+                </label>
+                <label className="flashcards-generator-field flashcards-count-field">
+                  <span>Cards</span>
+                  <select value={generator.count} onChange={(event) => setGenerator({ ...generator, count: event.target.value })}>
+                    <option value="5">5</option><option value="8">8</option><option value="12">12</option>
+                  </select>
+                </label>
+                <button className="primary-btn flashcards-generate-button" type="submit" disabled={isGenerating || !generator.subject || !generator.topic.trim()}>
+                  <WandSparkles size={16} /> {isGenerating ? "Making your cards…" : "Generate flashcards"}
+                </button>
+              </form>
+              {subjects.length === 0 && <p className="flashcards-subject-hint">Add a subject first on the <Link to="/subjects">Subjects page</Link>, then return here to build a deck.</p>}
+              {generationError && <p className="flashcards-generation-error" role="alert">{generationError}</p>}
+            </div>
+            <div className="flashcards-stack-art" aria-hidden="true">
+              <div className="stack-card stack-card-back"><span>FORMULA</span><i>∑</i></div>
+              <div className="stack-card stack-card-mid"><span>DEFINITION</span><i>π</i></div>
+              <div className="stack-card stack-card-front"><span>YOUR NEXT IDEA</span><i>✳</i><b>Ready<br />to remember.</b></div>
+              <span className="stack-art-caption">A SMALL STACK. A BIG DIFFERENCE.</span>
             </div>
           </section>
 
@@ -189,7 +318,7 @@ function Flashcards() {
                     ) : (
                       <>
                         <div className="flashcards-progress-row"><span>Card {activeIndex + 1} of {activeDeck.cards.length}</span><div className="flashcards-progress"><span style={{ width: `${((activeIndex + 1) / activeDeck.cards.length) * 100}%` }} /></div><span>{Math.round(((activeIndex + 1) / activeDeck.cards.length) * 100)}%</span></div>
-                        <button type="button" className={`flashcard ${isFlipped ? "is-flipped" : ""}`} onClick={() => setIsFlipped((value) => !value)} aria-label={isFlipped ? "Show question" : "Reveal answer"}>
+                        <button type="button" className={`flashcard tone-${activeIndex % 5} ${isFlipped ? "is-flipped" : ""}`} onClick={() => setIsFlipped((value) => !value)} aria-label={isFlipped ? "Show question" : "Reveal answer"}>
                           <span className="flashcard-topline"><span>{isFlipped ? "THE REVERSE" : "TAKE A MOMENT"}</span><ArrowLeftRight size={15} /></span>
                           <span className="flashcard-face-label">{isFlipped ? "ANSWER" : "QUESTION"}</span>
                           <span className="flashcard-text">{isFlipped ? activeCard.back : activeCard.front}</span>

@@ -22,7 +22,7 @@ function loadLocalEnv() {
 loadLocalEnv();
 
 const port = Number(process.env.PORT || 8787);
-const model = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+const model = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
 const requestCounts = new Map();
 const MAX_BODY_BYTES = 24_000;
 const RATE_LIMIT = 12;
@@ -63,7 +63,9 @@ async function readJson(request) {
 }
 
 const server = createServer(async (request, response) => {
-  if (request.method !== "POST" || request.url !== "/api/groq/chat") {
+  const isChatRequest = request.method === "POST" && request.url === "/api/groq/chat";
+  const isFlashcardRequest = request.method === "POST" && request.url === "/api/groq/flashcards";
+  if (!isChatRequest && !isFlashcardRequest) {
     sendJson(response, 404, { error: "Not found." });
     return;
   }
@@ -81,6 +83,74 @@ const server = createServer(async (request, response) => {
 
   try {
     const body = await readJson(request);
+    if (isFlashcardRequest) {
+      const { subject, topic, kind = "mixed", count = 8 } = body || {};
+      const cardCount = Number(count);
+      if (
+        typeof subject !== "string" || !subject.trim() || subject.length > 100 ||
+        typeof topic !== "string" || !topic.trim() || topic.length > 180 ||
+        !["definitions", "formulas", "mixed"].includes(kind) ||
+        !Number.isInteger(cardCount) || cardCount < 3 || cardCount > 12
+      ) {
+        sendJson(response, 400, { error: "Choose a subject, enter a topic, and select 3–12 cards." });
+        return;
+      }
+
+      const flashcardResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          temperature: 0.45,
+          max_completion_tokens: 2600,
+          messages: [
+            {
+              role: "system",
+              content: "Create accurate study flashcards. Return only a JSON object with a cards array. Each array item must have exactly two string fields: front (a concise question, term, or formula prompt) and back (a concise answer, definition, or formula with a brief explanation). Do not use markdown fences. Stay within the requested subject and topic. Never invent a formula if unsure; use a conceptual card instead.",
+            },
+            {
+              role: "user",
+              content: `Create exactly ${cardCount} ${kind} flashcards for the subject “${subject.trim()}” and topic “${topic.trim()}”. For formulas, put a recall prompt on the front and the correctly formatted formula with variable meanings on the back. For definitions, put the term or a clear question on the front and a concise accurate definition on the back. For mixed, combine useful definitions and formulas when appropriate. Return JSON shaped like {"cards":[{"front":"...","back":"..."}]}.`,
+            },
+          ],
+        }),
+        signal: AbortSignal.timeout(45_000),
+      });
+
+      const flashcardResult = await flashcardResponse.json().catch(() => ({}));
+      if (!flashcardResponse.ok) {
+        console.error("Groq flashcard request failed:", flashcardResponse.status, flashcardResult?.error?.message || "unknown error");
+        sendJson(response, 502, { error: "Groq could not generate these cards. Check your API key and model, then try again." });
+        return;
+      }
+
+      const generatedText = flashcardResult?.choices?.[0]?.message?.content?.trim() || "";
+      let generated;
+      try {
+        generated = JSON.parse(generatedText.replace(/^```(?:json)?\s*|\s*```$/g, ""));
+      } catch {
+        sendJson(response, 502, { error: "The AI returned cards in an unreadable format. Please try again." });
+        return;
+      }
+
+      const cards = Array.isArray(generated?.cards)
+        ? generated.cards
+            .filter((card) => typeof card?.front === "string" && typeof card?.back === "string")
+            .slice(0, cardCount)
+            .map((card) => ({ front: card.front.trim().slice(0, 500), back: card.back.trim().slice(0, 1200) }))
+            .filter((card) => card.front && card.back)
+        : [];
+      if (cards.length < 1) {
+        sendJson(response, 502, { error: "The AI did not return usable flashcards. Please try another topic." });
+        return;
+      }
+      sendJson(response, 200, { cards });
+      return;
+    }
+
     const messages = body?.messages;
     if (!Array.isArray(messages) || messages.length < 1 || messages.length > 24) {
       sendJson(response, 400, { error: "Send between 1 and 24 chat messages." });

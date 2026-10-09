@@ -15,6 +15,7 @@ import Analytics from "./pages/Analytics";
 import AIPlanner from "./pages/AIPlanner";
 import AIAssistant from "./pages/AIAssistant";
 import Flashcards from "./pages/Flashcards";
+import RecallRitual from "./pages/RecallRitual";
 
 function ProtectedRoute({ children }) {
   const isAuthenticated =
@@ -69,6 +70,15 @@ function App() {
           element={
             <ProtectedRoute>
               <Flashcards />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/recall"
+          element={
+            <ProtectedRoute>
+              <RecallRitual />
             </ProtectedRoute>
           }
         />

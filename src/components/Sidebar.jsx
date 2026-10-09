@@ -14,6 +14,7 @@ import {
   Sparkles,
   Target,
   Layers3,
+  RotateCcw,
 } from "lucide-react";
 
 export default function Sidebar({ mobileOpen = false, onClose }) {
@@ -47,6 +48,11 @@ export default function Sidebar({ mobileOpen = false, onClose }) {
       name: "Flashcards",
       path: "/flashcards",
       icon: Layers3,
+    },
+    {
+      name: "Recall Ritual",
+      path: "/recall",
+      icon: RotateCcw,
     },
     {
       name: "Calendar",

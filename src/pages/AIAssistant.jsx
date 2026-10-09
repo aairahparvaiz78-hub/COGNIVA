@@ -51,6 +51,8 @@ const quickPrompts = [
 function AIAssistant() {
   const [messages, setMessages] = useState(starterMessages);
   const [input, setInput] = useState("");
+  const [teachTopic, setTeachTopic] = useState("");
+  const [teachExplanation, setTeachExplanation] = useState("");
   const [copiedId, setCopiedId] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
 
@@ -104,9 +106,24 @@ function AIAssistant() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: conversation }),
       });
-      const result = await apiResponse.json();
+      const responseText = await apiResponse.text();
+      let result = {};
+      if (responseText.trim()) {
+        try {
+          result = JSON.parse(responseText);
+        } catch {
+          throw new Error(
+            `The chat server returned an unreadable response (HTTP ${apiResponse.status}). Check that the Groq API server is running, then try again.`
+          );
+        }
+      }
       if (!apiResponse.ok) {
-        throw new Error(result.error || "Cogniva couldn’t answer right now. Please try again.");
+        throw new Error(result.error || `The chat server returned HTTP ${apiResponse.status}. Check the API server terminal for details.`);
+      }
+      if (typeof result.answer !== "string" || !result.answer.trim()) {
+        throw new Error(
+          "The chat server returned an empty answer. Check the API server terminal and confirm its .env file has your Groq key."
+        );
       }
       const response = {
         id: Date.now() + 1,
@@ -132,6 +149,16 @@ function AIAssistant() {
   const handleSubmit = (event) => {
     event.preventDefault();
     sendMessage();
+  };
+
+  const reviewTeachBack = (event) => {
+    event.preventDefault();
+    const topic = teachTopic.trim();
+    const explanation = teachExplanation.trim();
+    if (!topic || !explanation || isTyping) return;
+    sendMessage(`TEACH-IT-BACK REVIEW\nTopic: ${topic}\nMy explanation: ${explanation}\n\nPlease respond warmly and specifically: first say what I understood correctly, then identify any important gap or misconception, then give one small question that would help me check my understanding. If my explanation is already accurate, say so clearly. Do not rewrite it into a long lecture.`);
+    setTeachTopic("");
+    setTeachExplanation("");
   };
 
   const clearChat = () => {
@@ -401,6 +428,23 @@ function AIAssistant() {
                   </li>
                 </ul>
               </div>
+
+              <form className="glass teachback-card" onSubmit={reviewTeachBack}>
+                <span className="eyebrow"><Brain size={13} /> TEACH IT BACK</span>
+                <h3>Put it in your own words.</h3>
+                <p>Explain a topic from memory. Cogniva will reflect what you understood and what to revisit.</p>
+                <label className="teachback-field">
+                  <span>Topic</span>
+                  <input value={teachTopic} onChange={(event) => setTeachTopic(event.target.value)} maxLength={100} placeholder="e.g. Virtual memory" />
+                </label>
+                <label className="teachback-field">
+                  <span>Your explanation</span>
+                  <textarea value={teachExplanation} onChange={(event) => setTeachExplanation(event.target.value)} maxLength={1200} placeholder="Explain it as if you were teaching a friend…" rows={4} />
+                </label>
+                <button className="primary-btn teachback-submit" type="submit" disabled={isTyping || !teachTopic.trim() || !teachExplanation.trim()}>
+                  <Sparkles size={15} /> Review my explanation
+                </button>
+              </form>
 
               <div className="glass assistant-planner-link">
                 <div className="planner-link-icon">
