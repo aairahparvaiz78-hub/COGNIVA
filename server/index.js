@@ -1,9 +1,24 @@
 import { createServer } from "node:http";
-import { readFileSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
+import { dirname, extname, resolve, sep } from "node:path";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const distRoot = resolve(projectRoot, "dist");
+const mimeTypes = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".ico": "image/x-icon",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+};
 
 function loadLocalEnv() {
   try {
@@ -23,6 +38,11 @@ loadLocalEnv();
 
 const port = Number(process.env.PORT || 8787);
 const model = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
+const configuredOrigins = (process.env.ALLOWED_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim().replace(/\/$/, ""))
+  .filter(Boolean);
+const localOrigins = ["http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:5173", "http://127.0.0.1:5174"];
 const requestCounts = new Map();
 const MAX_BODY_BYTES = 24_000;
 const RATE_LIMIT = 12;
@@ -35,6 +55,75 @@ function sendJson(response, status, payload) {
     "X-Content-Type-Options": "nosniff",
   });
   response.end(JSON.stringify(payload));
+}
+
+function handleCors(request, response) {
+  const origin = request.headers.origin;
+  const allowed = origin && (configuredOrigins.includes(origin) || localOrigins.includes(origin));
+
+  if (origin && allowed) {
+    response.setHeader("Access-Control-Allow-Origin", origin);
+    response.setHeader("Vary", "Origin");
+    response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  }
+
+  if (request.method === "OPTIONS") {
+    if (origin && !allowed) {
+      sendJson(response, 403, { error: "This website is not allowed to use the Cogniva API." });
+    } else {
+      response.writeHead(204);
+      response.end();
+    }
+    return true;
+  }
+
+  if (origin && !allowed) {
+    sendJson(response, 403, { error: "This website is not allowed to use the Cogniva API." });
+    return true;
+  }
+
+  return false;
+}
+
+function serveWebsite(request, response) {
+  if (!existsSync(resolve(distRoot, "index.html"))) {
+    sendJson(response, 503, { error: "The website build is missing. Run npm run build before starting the production server." });
+    return;
+  }
+
+  let pathname;
+  try {
+    pathname = decodeURIComponent(new URL(request.url, "http://localhost").pathname);
+  } catch {
+    sendJson(response, 400, { error: "Invalid URL." });
+    return;
+  }
+
+  const requestedFile = resolve(distRoot, `.${pathname}`);
+  if (requestedFile !== distRoot && !requestedFile.startsWith(`${distRoot}${sep}`)) {
+    sendJson(response, 403, { error: "Forbidden." });
+    return;
+  }
+
+  let filePath = requestedFile;
+  try {
+    if (!statSync(filePath).isFile()) filePath = resolve(distRoot, "index.html");
+  } catch {
+    // Client-side routes such as /flashcards should receive the app shell.
+    filePath = resolve(distRoot, "index.html");
+  }
+
+  response.writeHead(200, {
+    "Content-Type": mimeTypes[extname(filePath).toLowerCase()] || "application/octet-stream",
+    "Cache-Control": filePath.endsWith("index.html") ? "no-cache" : "public, max-age=31536000, immutable",
+    "X-Content-Type-Options": "nosniff",
+  });
+  if (request.method === "HEAD") {
+    response.end();
+    return;
+  }
+  createReadStream(filePath).pipe(response);
 }
 
 function isRateLimited(ip) {
@@ -63,8 +152,19 @@ async function readJson(request) {
 }
 
 const server = createServer(async (request, response) => {
-  const isChatRequest = request.method === "POST" && request.url === "https://cogniva-xfnq.onrender.com/api/groq/chat";
-  const isFlashcardRequest = request.method === "POST" && request.url === "https://cogniva-xfnq.onrender.com/api/groq/flashcards";
+  if (handleCors(request, response)) return;
+
+  if (request.method === "GET" || request.method === "HEAD") {
+    if (request.url === "/health") {
+      sendJson(response, 200, { ok: true });
+      return;
+    }
+    serveWebsite(request, response);
+    return;
+  }
+
+  const isChatRequest = request.method === "POST" && request.url === "/api/groq/chat";
+  const isFlashcardRequest = request.method === "POST" && request.url === "/api/groq/flashcards";
   if (!isChatRequest && !isFlashcardRequest) {
     sendJson(response, 404, { error: "Not found." });
     return;
@@ -96,7 +196,7 @@ const server = createServer(async (request, response) => {
         return;
       }
 
-      const flashcardResponse = await fetch("https://cogniva-xfnq.onrender.com/api.groq.com/openai/v1/chat/completions", {
+      const flashcardResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
@@ -166,7 +266,7 @@ const server = createServer(async (request, response) => {
       return { role: message.role, content };
     });
 
-    const groqResponse = await fetch("https://cogniva-xfnq.onrender.com/api.groq.com/openai/v1/chat/completions", {
+    const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
@@ -214,7 +314,7 @@ const server = createServer(async (request, response) => {
   }
 });
 
-
-server.listen(port, "0.0.0.0", () => {
-  console.log(`Cogniva Groq API listening on port ${port}`);
+const host = process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1";
+server.listen(port, host, () => {
+  console.log(`Cogniva web and Groq API listening on http://${host}:${port}`);
 });

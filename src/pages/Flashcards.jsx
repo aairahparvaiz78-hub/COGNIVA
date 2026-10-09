@@ -19,6 +19,7 @@ import {
 import Sidebar from "../components/Sidebar";
 
 const STORAGE_KEY = "cogniva_flashcard_decks";
+const API_BASE_URL = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
 
 function readDecks() {
   try {
@@ -107,7 +108,7 @@ function Flashcards() {
     setIsGenerating(true);
     setGenerationError("");
     try {
-      const response = await fetch("https://cogniva-xfnq.onrender.com/api/groq/flashcards", {
+      const response = await fetch(`${API_BASE_URL}/api/groq/flashcards`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
